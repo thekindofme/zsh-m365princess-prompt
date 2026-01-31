@@ -1,0 +1,128 @@
+#
+# Powerline-style ZSH prompt theme
+#
+# Inspired by:
+#   oh-my-posh M365Princess theme
+#   https://ohmyposh.dev/docs/themes#m365princess
+#
+# Features:
+#   * Colored segmented path bar with powerline separators
+#   * Git branch with  icon (only shown in git repos)
+#   * Time display with ♥ icon
+#   * Two-line prompt with cursor on new line
+#   * No RPROMPT (clean right side)
+#
+# Color palette (256-color approximations of M365Princess):
+#   Path segment:  168 - blush/pink (#DA627D)
+#   Git segment:   216 - salmon (#FCA17D)
+#   Time segment:  110 - sky blue (#86BBD8)
+#
+# Font requirement:
+#   This theme uses Powerline/Nerd Font unicode characters:
+#     - Segment separator:  (\ue0b0)
+#     - Git branch icon:    (\ue0a0)
+#     - Time icon:          (\uf017)
+#
+#   Install a Nerd Font for proper display:
+#     brew install font-meslo-lg-nerd-font
+#
+#   Then set your terminal font to "MesloLGM Nerd Font" (or similar)
+#   in iTerm2: Settings → Profiles → Text → Font
+#
+
+# Powerline characters
+SEGMENT_SEPARATOR=$'\ue0b0'
+BRANCH_ICON=$'\ue0a0'
+TIME_ICON=$'\uf017'
+
+# Colors (256-color) - M365Princess palette
+COLOR_PATH_BG=168      # blush/pink (#DA627D)
+COLOR_GIT_BG=216       # salmon (#FCA17D)
+COLOR_TIME_BG=110      # sky blue (#86BBD8)
+COLOR_FG=white
+COLOR_FG_DARK=black
+
+# Track current segment background for transitions
+CURRENT_BG='NONE'
+
+# Draw a segment with proper color transition
+# Usage: prompt_segment <bg_color> <fg_color> <content>
+prompt_segment() {
+  local bg fg
+  [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
+  [[ -n $2 ]] && fg="%F{$2}" || fg="%f"
+
+  if [[ $CURRENT_BG != 'NONE' && $1 != $CURRENT_BG ]]; then
+    echo -n " %{%K{$1}%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%} "
+  else
+    echo -n "%{$bg%}%{$fg%} "
+  fi
+  CURRENT_BG=$1
+  [[ -n $3 ]] && echo -n "$3"
+}
+
+# Close the prompt line
+prompt_end() {
+  if [[ -n $CURRENT_BG ]]; then
+    echo -n " %{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR"
+  else
+    echo -n "%{%k%}"
+  fi
+  echo -n "%{%f%}"
+  CURRENT_BG='NONE'
+}
+
+# Directory segment - blush/pink background
+prompt_dir() {
+  prompt_segment $COLOR_PATH_BG $COLOR_FG_DARK "%~"
+}
+
+# Git segment - salmon background (only if in git repo)
+prompt_git() {
+  local branch
+
+  # Check if we're in a git repository
+  if git rev-parse --is-inside-work-tree &>/dev/null; then
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
+    if [[ -n $branch ]]; then
+      prompt_segment $COLOR_GIT_BG $COLOR_FG_DARK "$BRANCH_ICON $branch"
+    fi
+  fi
+}
+
+# Time segment - sky blue background
+prompt_time() {
+  prompt_segment $COLOR_TIME_BG $COLOR_FG_DARK "$TIME_ICON %T"
+}
+
+# Build the main prompt line
+prompt_main() {
+  CURRENT_BG='NONE'
+  prompt_time
+  prompt_dir
+  prompt_git
+  prompt_end
+}
+
+function prompt_skwp_custom_precmd {
+  # Nothing special needed for precmd with this implementation
+  :
+}
+
+function prompt_skwp_custom_setup {
+  setopt LOCAL_OPTIONS
+  unsetopt XTRACE KSH_ARRAYS
+  prompt_opts=(cr percent sp subst)
+
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd prompt_skwp_custom_precmd
+
+  # Two-line prompt: powerline segments on first line, $ on second line
+  PROMPT='$(prompt_main)
+$ '
+
+  # No RPROMPT (removed ruby version)
+  RPROMPT=''
+}
+
+prompt_skwp_custom_setup "$@"
